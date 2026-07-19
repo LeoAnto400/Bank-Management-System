@@ -1,0 +1,2 @@
+current problems and bugs
+loan repayment problem, interest is payed for every transaction.

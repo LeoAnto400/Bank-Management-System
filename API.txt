@@ -1,0 +1,64 @@
+Test / Root
+
+GET /
+Purpose: health message from server.js
+GET /test-db
+Purpose: database connectivity test from server.js
+
+Auth
+
+POST /api/login
+POST /api/admin/login
+POST /api/signup
+Defined in authRoutes.js
+
+Customers
+
+GET /api/customers/me/dashboard
+PUT /api/customers/me/profile
+POST /api/customers/me/loan-applications
+POST /api/customers/me/loans/:loanId/repay
+GET /api/customers
+GET /api/customers/:id
+Defined in customerRoutes.js
+
+Accounts
+
+POST /api/accounts/me
+PATCH /api/accounts/:accountId/status
+GET /api/accounts
+GET /api/accounts/details/:id
+GET /api/accounts/:id
+Defined in accountRoutes.js
+
+Transactions
+
+POST /api/transactions/me
+GET /api/transactions/details/:accountId
+GET /api/transactions/:accountId
+Defined in transactionRoutes.js
+
+Transfers
+
+POST /api/transfers/me
+Defined in transferRoutes.js
+
+Fraud
+
+GET /api/fraud
+GET /api/fraud/high-risk
+Defined in fraudRoutes.js
+
+Dashboard
+
+GET /api/dashboard
+Defined in dashboardRoutes.js
+
+Admin
+
+GET /api/admin/me/dashboard
+POST /api/admin/accounts/:accountId/counter-transaction
+POST /api/admin/loan-applications/:applicationId/review
+PUT /api/admin/accounts/:accountId
+PUT /api/admin/customers/:customerId
+Defined in adminRoutes.js
