@@ -63,10 +63,11 @@ not just CRUD.
 ```
 backend/
   config/        env validation (fail-fast) + MySQL connection
-  controllers/   request handling + business logic (one file per resource)
+  controllers/   thin request handlers: parse, validate, call a service, respond
+  services/      business logic (dashboard aggregation, loan review/approval, admin access)
   middleware/    JWT auth guards, rate limiters
   routes/        Express route definitions
-  utils/         password hashing, JWT signing, loan/EMI math
+  utils/         password hashing, JWT signing, loan/EMI math, shared query helpers
   tests/         Jest + Supertest integration suite
   scripts/       test database setup
 banking-frontend/
@@ -204,6 +205,6 @@ Kept visible rather than hidden — these are the next things on the list:
 
 - The `Cards` table and its frontend page exist, but there's no backend controller for
   issuing/managing cards yet — it's a data-only stub.
-- Controllers currently mix SQL, validation, and response-shaping in one layer; a
-  service/repository split would improve testability of the larger ones (`adminController.js`,
-  `customerController.js`).
+- The remaining controllers (`accountController.js`, `transactionController.js`,
+  `transferController.js`) still inline their SQL directly; only the two largest
+  (`adminController.js`, `customerController.js`) have been split into `services/` so far.
