@@ -311,22 +311,6 @@ const buildDashboardPayload = async (customerId) => {
     };
 };
 
-exports.getCustomers = (req, res) => {
-    db.query('SELECT * FROM Customers', (err, results) => {
-        if (err) return res.status(500).send(err);
-        res.json(results);
-    });
-};
-
-exports.getCustomerById = (req, res) => {
-    const { id } = req.params;
-
-    db.query('SELECT * FROM Customers WHERE customer_id = ?', [id], (err, results) => {
-        if (err) return res.status(500).send(err);
-        res.json(results[0]);
-    });
-};
-
 exports.getMyDashboard = async (req, res) => {
     try {
         const customerId = req.user.customer_id;

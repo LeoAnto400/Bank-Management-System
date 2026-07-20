@@ -1,8 +1,10 @@
 const db = require('../config/db');
+const env = require('../config/env');
 const { signJwt } = require('../utils/jwt');
+const { hashPassword, verifyPassword } = require('../utils/password');
 const dbPromise = db.promise();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'development-secret-change-me';
+const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRES_IN_SECONDS = 60 * 60;
 
 const customerSignupFields = [
@@ -94,7 +96,9 @@ const recordLoginAttempt = async ({
     }
 };
 
-exports.signup = (req, res) => {
+const MIN_PASSWORD_LENGTH = 8;
+
+exports.signup = async (req, res) => {
     const payload = req.body || {};
     const role = payload.role;
 
@@ -112,6 +116,19 @@ exports.signup = (req, res) => {
         return res.status(400).json({
             message: `Missing required fields: ${missingFields.join(', ')}`,
         });
+    }
+
+    if (String(payload.password).length < MIN_PASSWORD_LENGTH) {
+        return res.status(400).json({
+            message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`,
+        });
+    }
+
+    let passwordHash;
+    try {
+        passwordHash = await hashPassword(payload.password);
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to process signup.' });
     }
 
     db.beginTransaction((transactionError) => {
@@ -174,9 +191,9 @@ exports.signup = (req, res) => {
                             customer_id,
                             password_hash
                         )
-                        VALUES (?, SHA2(?, 256))
+                        VALUES (?, ?)
                     `,
-                    [customerId, payload.password],
+                    [customerId, passwordHash],
                     (loginError) => {
                         if (loginError) {
                             return db.rollback(() => {
@@ -261,9 +278,9 @@ exports.signup = (req, res) => {
                         accountant_id,
                         password_hash
                     )
-                    VALUES (?, SHA2(?, 256))
+                    VALUES (?, ?)
                 `,
-                [accountantId, payload.password],
+                [accountantId, passwordHash],
                 (loginError) => {
                     if (loginError) {
                         return db.rollback(() => {
@@ -313,11 +330,12 @@ exports.login = async (req, res) => {
     }
 
     try {
-        const [[customerRecord]] = await dbPromise.query(
+        const [[user]] = await dbPromise.query(
             `
                 SELECT
                     cl.customer_login_id,
                     cl.customer_id,
+                    cl.password_hash,
                     c.customer_email,
                     c.first_name,
                     c.last_name,
@@ -330,35 +348,26 @@ exports.login = async (req, res) => {
             [identifier]
         );
 
-        const [[user]] = await dbPromise.query(
-            `
-                SELECT
-                    cl.customer_login_id,
-                    cl.customer_id,
-                    c.customer_email,
-                    c.first_name,
-                    c.last_name,
-                    cl.is_active
-                FROM customer_Login cl
-                JOIN customers c ON cl.customer_id = c.customer_id
-                WHERE c.customer_email = ?
-                  AND cl.password_hash = SHA2(?, 256)
-                LIMIT 1
-            `,
-            [identifier, password]
-        );
+        const { matches, upgradedHash } = await verifyPassword(password, user?.password_hash);
 
-        if (!user) {
+        if (!user || !matches) {
             await recordLoginAttempt({
-                customerId: customerRecord?.customer_id || null,
+                customerId: user?.customer_id || null,
                 loginRole: 'customer',
                 loginIdentifier: identifier,
                 ipAddress,
                 attemptStatus: 'Failed',
-                failureReason: customerRecord ? 'Invalid password.' : 'Unknown customer email.',
+                failureReason: user ? 'Invalid password.' : 'Unknown customer email.',
             });
 
             return res.status(401).json({ message: 'Invalid credentials.' });
+        }
+
+        if (upgradedHash) {
+            await dbPromise.query(
+                'UPDATE customer_Login SET password_hash = ? WHERE customer_login_id = ?',
+                [upgradedHash, user.customer_login_id]
+            );
         }
 
         if (Number(user.is_active) !== 1) {
@@ -422,24 +431,12 @@ exports.adminLogin = async (req, res) => {
     }
 
     try {
-        const [[adminRecord]] = await dbPromise.query(
-            `
-                SELECT
-                    al.admin_login_id,
-                    al.accountant_id
-                FROM admin_Login al
-                JOIN accountants a ON al.accountant_id = a.accountant_id
-                WHERE a.accountant_email = ?
-                LIMIT 1
-            `,
-            [identifier]
-        );
-
         const [[admin]] = await dbPromise.query(
             `
                 SELECT
                     al.admin_login_id,
                     al.accountant_id,
+                    al.password_hash,
                     a.accountant_email,
                     a.first_name,
                     a.last_name,
@@ -449,23 +446,31 @@ exports.adminLogin = async (req, res) => {
                 FROM admin_Login al
                 JOIN accountants a ON al.accountant_id = a.accountant_id
                 WHERE a.accountant_email = ?
-                  AND al.password_hash = SHA2(?, 256)
                 LIMIT 1
             `,
-            [identifier, password]
+            [identifier]
         );
 
-        if (!admin) {
+        const { matches, upgradedHash } = await verifyPassword(password, admin?.password_hash);
+
+        if (!admin || !matches) {
             await recordLoginAttempt({
-                accountantId: adminRecord?.accountant_id || null,
+                accountantId: admin?.accountant_id || null,
                 loginRole: 'admin',
                 loginIdentifier: identifier,
                 ipAddress,
                 attemptStatus: 'Failed',
-                failureReason: adminRecord ? 'Invalid password.' : 'Unknown admin email.',
+                failureReason: admin ? 'Invalid password.' : 'Unknown admin email.',
             });
 
             return res.status(401).json({ message: 'Invalid admin credentials.' });
+        }
+
+        if (upgradedHash) {
+            await dbPromise.query(
+                'UPDATE admin_Login SET password_hash = ? WHERE admin_login_id = ?',
+                [upgradedHash, admin.admin_login_id]
+            );
         }
 
         if (Number(admin.is_active) !== 1) {

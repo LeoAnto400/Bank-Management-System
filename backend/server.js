@@ -1,6 +1,6 @@
+const env = require('./config/env');
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
 
 const app = express();
 
@@ -43,8 +43,10 @@ app.use('/api/fraud', fraudRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 
-const PORT = 5000;
+if (require.main === module) {
+    app.listen(env.PORT, '0.0.0.0', () => {
+        console.log(`Server running on port ${env.PORT}`);
+    });
+}
 
-app.listen(PORT, '0.0.0.0',() => {
-    console.log(`Server running on port ${PORT}`);
-});
+module.exports = app;

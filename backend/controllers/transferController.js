@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { verifyPassword } = require('../utils/password');
 
 const dbPromise = db.promise();
 
@@ -50,21 +51,29 @@ exports.createMyTransfer = async (req, res) => {
 
         const [loginRows] = await dbPromise.query(
             `
-                SELECT customer_login_id
+                SELECT customer_login_id, password_hash
                 FROM Customer_Login
                 WHERE customer_id = ?
-                  AND password_hash = SHA2(?, 256)
                   AND is_active = 1
                 LIMIT 1
             `,
-            [customerId, password]
+            [customerId]
         );
 
-        if (!loginRows[0]) {
+        const { matches, upgradedHash } = await verifyPassword(password, loginRows[0]?.password_hash);
+
+        if (!loginRows[0] || !matches) {
             await dbPromise.rollback();
             return res.status(401).json({
                 message: 'Password verification failed.',
             });
+        }
+
+        if (upgradedHash) {
+            await dbPromise.query(
+                'UPDATE Customer_Login SET password_hash = ? WHERE customer_login_id = ?',
+                [upgradedHash, loginRows[0].customer_login_id]
+            );
         }
 
         const [senderRows] = await dbPromise.query(

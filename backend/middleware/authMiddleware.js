@@ -1,6 +1,7 @@
 const { verifyJwt } = require('../utils/jwt');
+const env = require('../config/env');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'development-secret-change-me';
+const JWT_SECRET = env.JWT_SECRET;
 
 exports.requireAuth = (req, res, next) => {
     const authorization = req.headers.authorization || '';

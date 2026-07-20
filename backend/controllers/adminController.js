@@ -4,6 +4,7 @@ const {
     calculateEmi,
     generateReferenceNumber,
 } = require('../utils/loanUtils');
+const { verifyPassword } = require('../utils/password');
 
 const dbPromise = db.promise();
 
@@ -77,17 +78,29 @@ const verifyAdminPassword = async (accountantId, password) => {
 
     const [[login]] = await dbPromise.query(
         `
-            SELECT admin_login_id
+            SELECT admin_login_id, password_hash
             FROM Admin_Login
             WHERE accountant_id = ?
-              AND password_hash = SHA2(?, 256)
               AND is_active = 1
             LIMIT 1
         `,
-        [accountantId, secret]
+        [accountantId]
     );
 
-    return Boolean(login);
+    if (!login) {
+        return false;
+    }
+
+    const { matches, upgradedHash } = await verifyPassword(secret, login.password_hash);
+
+    if (upgradedHash) {
+        await dbPromise.query(
+            'UPDATE Admin_Login SET password_hash = ? WHERE admin_login_id = ?',
+            [upgradedHash, login.admin_login_id]
+        );
+    }
+
+    return matches;
 };
 
 exports.getMyDashboard = async (req, res) => {
