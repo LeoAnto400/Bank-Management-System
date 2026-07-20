@@ -1,6 +1,7 @@
 const env = require('./config/env');
 const express = require('express');
 const cors = require('cors');
+const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
@@ -42,6 +43,9 @@ app.use('/api/transfers', transferRoutes);
 app.use('/api/fraud', fraudRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 if (require.main === module) {
     app.listen(env.PORT, '0.0.0.0', () => {
