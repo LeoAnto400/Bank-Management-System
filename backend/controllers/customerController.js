@@ -2,6 +2,7 @@ const db = require('../config/db');
 const {
     DEFAULT_LOAN_RATES,
     addMonthsToDate,
+    calculateAccruedInterest,
     calculateEmi,
     generateReferenceNumber,
     getLoanTypeOptions,
@@ -593,6 +594,7 @@ exports.repayMyLoan = async (req, res) => {
                     l.tenure_months,
                     l.emi_amount,
                     l.outstanding_amount,
+                    l.disbursement_date,
                     l.loan_status
                 FROM Loans l
                 WHERE l.loan_id = ?
@@ -662,8 +664,28 @@ exports.repayMyLoan = async (req, res) => {
             return res.status(400).json({ message: 'Insufficient balance in the selected source account.' });
         }
 
-        const estimatedInterest = Number(
-            ((outstandingAmount * Number(loan.annual_interest_rate || 0)) / 1200).toFixed(2)
+        // Interest accrues on the outstanding balance for the actual number of
+        // days since the last payment (or disbursement, for the first payment) —
+        // not a flat month's worth on every call, which previously overcharged
+        // interest whenever a customer made more than one repayment per month.
+        const [[accrualRow]] = await dbPromise.query(
+            `
+                SELECT DATEDIFF(
+                    CURDATE(),
+                    COALESCE(
+                        (SELECT MAX(payment_date) FROM Loan_Payments WHERE loan_id = ?),
+                        ?
+                    )
+                ) AS days_since_last_event
+            `,
+            [loanId, loan.disbursement_date]
+        );
+        const daysSinceLastEvent = Math.max(0, Number(accrualRow?.days_since_last_event || 0));
+
+        const estimatedInterest = calculateAccruedInterest(
+            outstandingAmount,
+            loan.annual_interest_rate,
+            daysSinceLastEvent
         );
         const interestComponent = Math.min(repaymentAmount, estimatedInterest);
         const principalComponent = Number((repaymentAmount - interestComponent).toFixed(2));

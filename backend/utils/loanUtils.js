@@ -53,6 +53,24 @@ const calculateEmi = (principalAmount, annualInterestRate, tenureMonths) => {
     return Number(emi.toFixed(2));
 };
 
+// Accrues interest on the outstanding balance for the actual number of days
+// elapsed since the last payment (or disbursement), rather than always
+// charging a flat month's interest regardless of how recently the last
+// payment was made.
+const calculateAccruedInterest = (outstandingAmount, annualInterestRate, daysElapsed) => {
+    const outstanding = Number(outstandingAmount || 0);
+    const annualRate = Number(annualInterestRate || 0);
+    const days = Math.max(0, Number(daysElapsed || 0));
+
+    if (!Number.isFinite(outstanding) || outstanding <= 0 || !Number.isFinite(annualRate) || annualRate <= 0) {
+        return 0;
+    }
+
+    const dailyRate = annualRate / 100 / 365;
+
+    return Number((outstanding * dailyRate * days).toFixed(2));
+};
+
 const addMonthsToDate = (dateValue, monthsToAdd) => {
     const date = new Date(dateValue);
 
@@ -76,6 +94,7 @@ module.exports = {
     DEFAULT_LOAN_RATES,
     getLoanTypeOptions,
     calculateEmi,
+    calculateAccruedInterest,
     addMonthsToDate,
     generateReferenceNumber,
 };

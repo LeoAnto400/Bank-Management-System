@@ -202,8 +202,6 @@ repeated failed logins and post-lockout "account takeover" attempts.
 
 Kept visible rather than hidden — these are the next things on the list:
 
-- Loan repayment recalculates interest from the outstanding balance on every payment instead
-  of against a fixed amortization schedule (tracked, not yet fixed).
 - The `Cards` table and its frontend page exist, but there's no backend controller for
   issuing/managing cards yet — it's a data-only stub.
 - Controllers currently mix SQL, validation, and response-shaping in one layer; a
