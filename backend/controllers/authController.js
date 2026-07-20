@@ -131,190 +131,174 @@ exports.signup = async (req, res) => {
         return res.status(500).json({ message: 'Failed to process signup.' });
     }
 
-    db.beginTransaction((transactionError) => {
-        if (transactionError) {
-            return res.status(500).json({ message: 'Failed to start signup transaction.' });
-        }
+    try {
+        await dbPromise.beginTransaction();
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to start signup transaction.' });
+    }
 
-        if (role === 'customer') {
-            const customerValues = [
-                payload.first_name,
-                payload.last_name,
-                payload.date_of_birth,
-                payload.gender,
-                payload.pan_number,
-                payload.aadhaar_number,
-                payload.customer_phone,
-                payload.customer_email,
-                payload.customer_address,
-                payload.customer_city,
-                payload.customer_state,
-                payload.pincode,
-            ];
+    if (role === 'customer') {
+        let customerId;
 
-            const insertCustomerQuery = `
-                INSERT INTO Customers (
-                    first_name,
-                    last_name,
-                    date_of_birth,
-                    gender,
-                    pan_number,
-                    aadhaar_number,
-                    customer_phone,
-                    customer_email,
-                    customer_address,
-                    customer_city,
-                    customer_state,
-                    pincode
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-
-            db.query(insertCustomerQuery, customerValues, (customerError, customerResult) => {
-                if (customerError) {
-                    return db.rollback(() => {
-                        const message = isDuplicateEntryError(customerError)
-                            ? 'A customer with that PAN, Aadhaar, or email already exists.'
-                            : 'Failed to create customer account.';
-
-                        return res.status(isDuplicateEntryError(customerError) ? 409 : 500).json({
-                            message,
-                        });
-                    });
-                }
-
-                const customerId = customerResult.insertId;
-
-                db.query(
-                    `
-                        INSERT INTO Customer_Login (
-                            customer_id,
-                            password_hash
-                        )
-                        VALUES (?, ?)
-                    `,
-                    [customerId, passwordHash],
-                    (loginError) => {
-                        if (loginError) {
-                            return db.rollback(() => {
-                                const message = isDuplicateEntryError(loginError)
-                                    ? 'Login credentials already exist for this customer.'
-                                    : 'Failed to create customer login credentials.';
-
-                                return res
-                                    .status(isDuplicateEntryError(loginError) ? 409 : 500)
-                                    .json({ message });
-                            });
-                        }
-
-                        db.commit((commitError) => {
-                            if (commitError) {
-                                return db.rollback(() =>
-                                    res.status(500).json({
-                                        message: 'Failed to complete signup.',
-                                    })
-                                );
-                            }
-
-                            return res.status(201).json({
-                                message: 'Customer signup successful.',
-                                user: {
-                                    customer_id: customerId,
-                                    customer_email: payload.customer_email,
-                                    user_role: 'customer',
-                                },
-                            });
-                        });
-                    }
-                );
-            });
-
-            return;
-        }
-
-        const adminValues = [
-            payload.branch_id,
-            payload.first_name,
-            payload.last_name,
-            payload.employee_code,
-            payload.employee_role,
-            payload.accountant_phone,
-            payload.accountant_email,
-            payload.joining_date,
-        ];
-
-        const insertAdminQuery = `
-            INSERT INTO Accountants (
-                branch_id,
-                first_name,
-                last_name,
-                employee_code,
-                employee_role,
-                accountant_phone,
-                accountant_email,
-                joining_date
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        db.query(insertAdminQuery, adminValues, (adminError, adminResult) => {
-            if (adminError) {
-                return db.rollback(() => {
-                    const message = isDuplicateEntryError(adminError)
-                        ? 'An accountant with that employee code or email already exists.'
-                        : 'Failed to create accountant account.';
-
-                    return res.status(isDuplicateEntryError(adminError) ? 409 : 500).json({
-                        message,
-                    });
-                });
-            }
-
-            const accountantId = adminResult.insertId;
-
-            db.query(
+        try {
+            const [customerResult] = await dbPromise.query(
                 `
-                    INSERT INTO Admin_Login (
-                        accountant_id,
+                    INSERT INTO Customers (
+                        first_name,
+                        last_name,
+                        date_of_birth,
+                        gender,
+                        pan_number,
+                        aadhaar_number,
+                        customer_phone,
+                        customer_email,
+                        customer_address,
+                        customer_city,
+                        customer_state,
+                        pincode
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+                [
+                    payload.first_name,
+                    payload.last_name,
+                    payload.date_of_birth,
+                    payload.gender,
+                    payload.pan_number,
+                    payload.aadhaar_number,
+                    payload.customer_phone,
+                    payload.customer_email,
+                    payload.customer_address,
+                    payload.customer_city,
+                    payload.customer_state,
+                    payload.pincode,
+                ]
+            );
+
+            customerId = customerResult.insertId;
+        } catch (customerError) {
+            await dbPromise.rollback();
+
+            const message = isDuplicateEntryError(customerError)
+                ? 'A customer with that PAN, Aadhaar, or email already exists.'
+                : 'Failed to create customer account.';
+
+            return res.status(isDuplicateEntryError(customerError) ? 409 : 500).json({ message });
+        }
+
+        try {
+            await dbPromise.query(
+                `
+                    INSERT INTO Customer_Login (
+                        customer_id,
                         password_hash
                     )
                     VALUES (?, ?)
                 `,
-                [accountantId, passwordHash],
-                (loginError) => {
-                    if (loginError) {
-                        return db.rollback(() => {
-                            const message = isDuplicateEntryError(loginError)
-                                ? 'Login credentials already exist for this admin.'
-                                : 'Failed to create admin login credentials.';
-
-                            return res
-                                .status(isDuplicateEntryError(loginError) ? 409 : 500)
-                                .json({ message });
-                        });
-                    }
-
-                    db.commit((commitError) => {
-                        if (commitError) {
-                            return db.rollback(() =>
-                                res.status(500).json({
-                                    message: 'Failed to complete signup.',
-                                })
-                            );
-                        }
-
-                        return res.status(201).json({
-                            message: 'Admin signup successful.',
-                            user: {
-                                accountant_id: accountantId,
-                                accountant_email: payload.accountant_email,
-                                user_role: 'admin',
-                            },
-                        });
-                    });
-                }
+                [customerId, passwordHash]
             );
+        } catch (loginError) {
+            await dbPromise.rollback();
+
+            const message = isDuplicateEntryError(loginError)
+                ? 'Login credentials already exist for this customer.'
+                : 'Failed to create customer login credentials.';
+
+            return res.status(isDuplicateEntryError(loginError) ? 409 : 500).json({ message });
+        }
+
+        try {
+            await dbPromise.commit();
+        } catch (commitError) {
+            await dbPromise.rollback();
+            return res.status(500).json({ message: 'Failed to complete signup.' });
+        }
+
+        return res.status(201).json({
+            message: 'Customer signup successful.',
+            user: {
+                customer_id: customerId,
+                customer_email: payload.customer_email,
+                user_role: 'customer',
+            },
         });
+    }
+
+    let accountantId;
+
+    try {
+        const [adminResult] = await dbPromise.query(
+            `
+                INSERT INTO Accountants (
+                    branch_id,
+                    first_name,
+                    last_name,
+                    employee_code,
+                    employee_role,
+                    accountant_phone,
+                    accountant_email,
+                    joining_date
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+            [
+                payload.branch_id,
+                payload.first_name,
+                payload.last_name,
+                payload.employee_code,
+                payload.employee_role,
+                payload.accountant_phone,
+                payload.accountant_email,
+                payload.joining_date,
+            ]
+        );
+
+        accountantId = adminResult.insertId;
+    } catch (adminError) {
+        await dbPromise.rollback();
+
+        const message = isDuplicateEntryError(adminError)
+            ? 'An accountant with that employee code or email already exists.'
+            : 'Failed to create accountant account.';
+
+        return res.status(isDuplicateEntryError(adminError) ? 409 : 500).json({ message });
+    }
+
+    try {
+        await dbPromise.query(
+            `
+                INSERT INTO Admin_Login (
+                    accountant_id,
+                    password_hash
+                )
+                VALUES (?, ?)
+            `,
+            [accountantId, passwordHash]
+        );
+    } catch (loginError) {
+        await dbPromise.rollback();
+
+        const message = isDuplicateEntryError(loginError)
+            ? 'Login credentials already exist for this admin.'
+            : 'Failed to create admin login credentials.';
+
+        return res.status(isDuplicateEntryError(loginError) ? 409 : 500).json({ message });
+    }
+
+    try {
+        await dbPromise.commit();
+    } catch (commitError) {
+        await dbPromise.rollback();
+        return res.status(500).json({ message: 'Failed to complete signup.' });
+    }
+
+    return res.status(201).json({
+        message: 'Admin signup successful.',
+        user: {
+            accountant_id: accountantId,
+            accountant_email: payload.accountant_email,
+            user_role: 'admin',
+        },
     });
 };
 

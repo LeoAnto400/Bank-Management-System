@@ -13,15 +13,15 @@ app.get('/', (req, res) => {
     res.send("Financial Management System API running");
 });
 
-app.get('/test-db', (req, res) => {
+app.get('/test-db', async (req, res) => {
     const db = require('./config/db');
 
-    db.query('SELECT 1', (err, result) => {
-        if (err) {
-            return res.status(500).send("DB Error");
-        }
+    try {
+        await db.promise().query('SELECT 1');
         res.send("Database connected successfully");
-    });
+    } catch {
+        res.status(500).send("DB Error");
+    }
 });
 
 const customerRoutes = require('./routes/customerRoutes');
