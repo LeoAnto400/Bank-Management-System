@@ -340,8 +340,8 @@ exports.login = async (req, res) => {
                     c.first_name,
                     c.last_name,
                     cl.is_active
-                FROM customer_Login cl
-                JOIN customers c ON cl.customer_id = c.customer_id
+                FROM Customer_Login cl
+                JOIN Customers c ON cl.customer_id = c.customer_id
                 WHERE c.customer_email = ?
                 LIMIT 1
             `,
@@ -365,7 +365,7 @@ exports.login = async (req, res) => {
 
         if (upgradedHash) {
             await dbPromise.query(
-                'UPDATE customer_Login SET password_hash = ? WHERE customer_login_id = ?',
+                'UPDATE Customer_Login SET password_hash = ? WHERE customer_login_id = ?',
                 [upgradedHash, user.customer_login_id]
             );
         }
@@ -385,7 +385,7 @@ exports.login = async (req, res) => {
         });
 
         await dbPromise.query(
-            'UPDATE customer_Login SET last_login = NOW() WHERE customer_login_id = ?',
+            'UPDATE Customer_Login SET last_login = NOW() WHERE customer_login_id = ?',
             [user.customer_login_id]
         );
 
@@ -443,8 +443,8 @@ exports.adminLogin = async (req, res) => {
                     a.branch_id,
                     a.employee_role,
                     al.is_active
-                FROM admin_Login al
-                JOIN accountants a ON al.accountant_id = a.accountant_id
+                FROM Admin_Login al
+                JOIN Accountants a ON al.accountant_id = a.accountant_id
                 WHERE a.accountant_email = ?
                 LIMIT 1
             `,
@@ -468,7 +468,7 @@ exports.adminLogin = async (req, res) => {
 
         if (upgradedHash) {
             await dbPromise.query(
-                'UPDATE admin_Login SET password_hash = ? WHERE admin_login_id = ?',
+                'UPDATE Admin_Login SET password_hash = ? WHERE admin_login_id = ?',
                 [upgradedHash, admin.admin_login_id]
             );
         }
@@ -488,7 +488,7 @@ exports.adminLogin = async (req, res) => {
         });
 
         await dbPromise.query(
-            'UPDATE admin_Login SET last_login = NOW() WHERE admin_login_id = ?',
+            'UPDATE Admin_Login SET last_login = NOW() WHERE admin_login_id = ?',
             [admin.admin_login_id]
         );
 
