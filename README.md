@@ -48,6 +48,8 @@ not just CRUD.
 - Self-service account opening, status changes (Active / Frozen / Closed)
 - Self-service deposits, withdrawals, and internal transfers (capped per transaction, with
   password re-confirmation on transfers)
+- Debit/credit card issuance and self-service block/unblock, with the CVV shown once at
+  issuance and only ever stored as a hash
 - Loan application, branch-accountant approve/reject workflow with EMI calculation, and loan
   repayment with interest/principal splitting
 - Branch admin dashboard: accounts, customers, transactions, active loans, audit log, and
@@ -174,6 +176,8 @@ the JWT; nothing lets a caller act on another customer's data.
 | PATCH | `/accounts/:accountId/status` | Customer | Change account status |
 | POST | `/transactions/me` | Customer | Self-service deposit/withdrawal |
 | POST | `/transfers/me` | Customer | Internal transfer (password-confirmed) |
+| POST | `/cards/me` | Customer | Issue a debit/credit card for one of my accounts |
+| PATCH | `/cards/:cardId/status` | Customer | Block/unblock a card |
 | GET | `/admin/me/dashboard` | Admin | Branch-scoped accounts/customers/loans/audit log |
 | POST | `/admin/accounts/:accountId/counter-transaction` | Admin | Branch counter deposit/withdrawal |
 | POST | `/admin/loan-applications/:applicationId/review` | Admin | Approve/reject a loan application |
@@ -203,8 +207,6 @@ repeated failed logins and post-lockout "account takeover" attempts.
 
 Kept visible rather than hidden — these are the next things on the list:
 
-- The `Cards` table and its frontend page exist, but there's no backend controller for
-  issuing/managing cards yet — it's a data-only stub.
 - The remaining controllers (`accountController.js`, `transactionController.js`,
   `transferController.js`) still inline their SQL directly; only the two largest
   (`adminController.js`, `customerController.js`) have been split into `services/` so far.

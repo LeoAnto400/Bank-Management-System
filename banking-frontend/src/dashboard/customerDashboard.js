@@ -4,6 +4,8 @@ import { apiBaseUrl } from '../config/api'
 
 export const accountTypeOptions = ['Savings', 'Current', 'Fixed Deposit', 'Recurring Deposit']
 export const accountStatusOptions = ['Active', 'Frozen', 'Closed']
+export const cardTypeOptions = ['Debit', 'Credit']
+export const cardNetworkOptions = ['Visa', 'MasterCard', 'RuPay', 'Amex']
 export const transactionTypeOptions = ['Credit', 'Debit']
 export const transactionChannelOptions = [
   'ATM',
@@ -87,6 +89,12 @@ export function useCustomerDashboard() {
   const [accountForm, setAccountForm] = useState({
     account_type: accountTypeOptions[0],
   })
+  const [cardForm, setCardForm] = useState({
+    account_id: '',
+    card_type: cardTypeOptions[0],
+    card_network: cardNetworkOptions[0],
+    credit_limit: '',
+  })
   const [transactionForm, setTransactionForm] = useState({
     account_id: '',
     transaction_type: transactionTypeOptions[0],
@@ -117,6 +125,8 @@ export function useCustomerDashboard() {
   const [isSaving, setIsSaving] = useState(false)
   const [isCreatingAccount, setIsCreatingAccount] = useState(false)
   const [isUpdatingAccountStatus, setIsUpdatingAccountStatus] = useState(false)
+  const [isIssuingCard, setIsIssuingCard] = useState(false)
+  const [isUpdatingCardStatus, setIsUpdatingCardStatus] = useState(false)
   const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false)
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false)
   const [isSubmittingLoanApplication, setIsSubmittingLoanApplication] = useState(false)
@@ -167,6 +177,20 @@ export function useCustomerDashboard() {
       sender_account_id:
         accounts?.some((account) => String(account.account_id) === String(current.sender_account_id))
           ? current.sender_account_id
+          : String(
+              accounts?.find((account) => account.account_status === 'Active')?.account_id ||
+                accounts?.[0]?.account_id ||
+                ''
+            ),
+    }))
+  }
+
+  const syncCardForm = (accounts) => {
+    setCardForm((current) => ({
+      ...current,
+      account_id:
+        accounts?.some((account) => String(account.account_id) === String(current.account_id))
+          ? current.account_id
           : String(
               accounts?.find((account) => account.account_status === 'Active')?.account_id ||
                 accounts?.[0]?.account_id ||
@@ -239,6 +263,7 @@ export function useCustomerDashboard() {
       setDashboard(data)
       syncProfileForm(data.profile)
       syncTransactionForm(data.accounts)
+      syncCardForm(data.accounts)
       syncLoanForms(data.accounts, data.loans, data.loan_types, data.loan_payment_methods)
     } catch (requestError) {
       setError(
@@ -432,6 +457,110 @@ export function useCustomerDashboard() {
       )
     } finally {
       setIsUpdatingAccountStatus(false)
+    }
+  }
+
+  const handleCardFormChange = (event) => {
+    const { name, value } = event.target
+    setCardForm((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === 'card_type' && value !== 'Credit' ? { credit_limit: '' } : {}),
+    }))
+  }
+
+  const handleIssueCard = async (event) => {
+    event.preventDefault()
+    setIsIssuingCard(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/cards/me`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          account_id: Number(cardForm.account_id),
+          card_type: cardForm.card_type,
+          card_network: cardForm.card_network,
+          credit_limit: cardForm.card_type === 'Credit' && cardForm.credit_limit !== ''
+            ? Number(cardForm.credit_limit)
+            : undefined,
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to issue card.')
+      }
+
+      setSuccess(data.message || 'Card issued successfully.')
+      setCardForm((current) => ({
+        ...current,
+        card_type: cardTypeOptions[0],
+        card_network: cardNetworkOptions[0],
+        credit_limit: '',
+      }))
+      await loadDashboard()
+
+      const issuedCard = data.card
+      if (issuedCard) {
+        openAccountCreationModal({
+          title: 'Card issued — save your CVV now',
+          description: `Card ending in ${String(issuedCard.card_number || '').slice(-4)}. CVV: ${issuedCard.cvv}. This is shown once and cannot be retrieved again.`,
+          confirmLabel: 'I have saved it',
+          showCancel: false,
+          onConfirm: null,
+        })
+      }
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Something went wrong while issuing the card.'
+      )
+    } finally {
+      setIsIssuingCard(false)
+    }
+  }
+
+  const handleCardStatusChange = async (cardId, cardStatus) => {
+    setIsUpdatingCardStatus(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/cards/${cardId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          card_status: cardStatus,
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update card status.')
+      }
+
+      setSuccess(data.message || 'Card status updated successfully.')
+      await loadDashboard()
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Something went wrong while updating card status.'
+      )
+    } finally {
+      setIsUpdatingCardStatus(false)
     }
   }
 
@@ -767,6 +896,7 @@ export function useCustomerDashboard() {
     dashboard,
     profileForm,
     accountForm,
+    cardForm,
     transactionForm,
     transferForm,
     loanApplicationForm,
@@ -775,6 +905,8 @@ export function useCustomerDashboard() {
     isSaving,
     isCreatingAccount,
     isUpdatingAccountStatus,
+    isIssuingCard,
+    isUpdatingCardStatus,
     isSubmittingTransaction,
     isSubmittingTransfer,
     isSubmittingLoanApplication,
@@ -790,6 +922,9 @@ export function useCustomerDashboard() {
     handleAccountFormChange,
     handleCreateAccount,
     handleAccountStatusChange,
+    handleCardFormChange,
+    handleIssueCard,
+    handleCardStatusChange,
     handleTransactionFormChange,
     handleTransactionSubmit,
     handleTransferFormChange,

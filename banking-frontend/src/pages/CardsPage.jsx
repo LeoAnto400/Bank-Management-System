@@ -1,19 +1,36 @@
 import { Link } from 'react-router-dom'
+import AppModal from '../components/AppModal.jsx'
 import CustomerDashboardLayout from '../components/CustomerDashboardLayout.jsx'
-import { formatCurrency, formatDate, useCustomerDashboard } from '../dashboard/customerDashboard.js'
+import {
+  cardNetworkOptions,
+  cardTypeOptions,
+  formatCurrency,
+  formatDate,
+  useCustomerDashboard,
+} from '../dashboard/customerDashboard.js'
 
 function CardsPage() {
   const {
     dashboard,
     isLoading,
+    isIssuingCard,
+    isUpdatingCardStatus,
+    cardForm,
+    accountCreationModal,
     error,
     success,
     storedUser,
     handleLogout,
+    handleCardFormChange,
+    handleIssueCard,
+    handleCardStatusChange,
+    handleAccountCreationModalConfirm,
+    closeAccountCreationModal,
   } = useCustomerDashboard()
 
   const cards = dashboard?.cards || []
   const accounts = dashboard?.accounts || []
+  const activeAccounts = accounts.filter((account) => account.account_status === 'Active')
 
   const creditCards = cards.filter((card) => card.card_type === 'Credit')
   const debitCards = cards.filter((card) => card.card_type === 'Debit')
@@ -94,6 +111,25 @@ function CardsPage() {
                       <p>Credit limit: {card.credit_limit ? formatCurrency(card.credit_limit) : 'Not applicable'}</p>
                       <p>Linked account: {card.account_number}</p>
                     </div>
+                    {['Active', 'Blocked'].includes(card.card_status) && (
+                      <button
+                        type="button"
+                        className="button-link button-link--secondary dashboard-inline-button"
+                        disabled={isUpdatingCardStatus}
+                        onClick={() =>
+                          handleCardStatusChange(
+                            card.card_id,
+                            card.card_status === 'Blocked' ? 'Active' : 'Blocked'
+                          )
+                        }
+                      >
+                        {isUpdatingCardStatus
+                          ? 'Saving...'
+                          : card.card_status === 'Blocked'
+                            ? 'Unblock Card'
+                            : 'Block Card'}
+                      </button>
+                    )}
                   </article>
                 ))
               ) : (
@@ -104,6 +140,88 @@ function CardsPage() {
         </div>
 
         <div className="dashboard-column">
+          <article className="dashboard-panel">
+            <div className="dashboard-panel__header">
+              <div>
+                <p className="hero-card__eyebrow">Issue Card</p>
+                <h3>Issue a new debit or credit card</h3>
+              </div>
+            </div>
+            <form className="auth-form dashboard-profile__form" onSubmit={handleIssueCard}>
+              <label className="field-group">
+                <span>Account</span>
+                <select
+                  name="account_id"
+                  value={cardForm.account_id}
+                  onChange={handleCardFormChange}
+                  disabled={isIssuingCard || activeAccounts.length === 0}
+                >
+                  <option value="">Select an active account</option>
+                  {activeAccounts.map((account) => (
+                    <option key={account.account_id} value={account.account_id}>
+                      {account.account_number} · {account.account_type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-group">
+                <span>Card type</span>
+                <select
+                  name="card_type"
+                  value={cardForm.card_type}
+                  onChange={handleCardFormChange}
+                  disabled={isIssuingCard}
+                >
+                  {cardTypeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-group">
+                <span>Card network</span>
+                <select
+                  name="card_network"
+                  value={cardForm.card_network}
+                  onChange={handleCardFormChange}
+                  disabled={isIssuingCard}
+                >
+                  {cardNetworkOptions.map((network) => (
+                    <option key={network} value={network}>
+                      {network}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {cardForm.card_type === 'Credit' && (
+                <label className="field-group">
+                  <span>Credit limit</span>
+                  <input
+                    name="credit_limit"
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={cardForm.credit_limit}
+                    onChange={handleCardFormChange}
+                    disabled={isIssuingCard}
+                    placeholder="e.g. 50000"
+                  />
+                </label>
+              )}
+              <p className="auth-helper auth-helper--muted">
+                The card's CVV is shown once immediately after issuance and cannot be retrieved again.
+              </p>
+              <button
+                type="submit"
+                className="button-link button-link--primary auth-submit"
+                disabled={isIssuingCard || !cardForm.account_id}
+              >
+                {isIssuingCard ? 'Issuing Card...' : 'Issue Card'}
+              </button>
+            </form>
+          </article>
+
           <article className="dashboard-panel">
             <div className="dashboard-panel__header">
               <div>
@@ -128,6 +246,18 @@ function CardsPage() {
           </article>
         </div>
       </div>
+
+      <AppModal
+        isOpen={accountCreationModal.isOpen}
+        eyebrow="Card Issued"
+        title={accountCreationModal.title}
+        description={accountCreationModal.description}
+        confirmLabel={accountCreationModal.confirmLabel}
+        cancelLabel={accountCreationModal.cancelLabel}
+        showCancel={accountCreationModal.showCancel}
+        onConfirm={handleAccountCreationModalConfirm}
+        onClose={closeAccountCreationModal}
+      />
     </CustomerDashboardLayout>
   )
 }
