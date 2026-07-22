@@ -133,6 +133,7 @@ of the box.
 | `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL connection details |
 | `JWT_SECRET` | Random string, 32+ characters. The server refuses to start without it — there is no insecure default. Generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
 | `PORT` | API port (default `5000`) |
+| `CORS_ORIGIN` | Comma-separated list of browser origins allowed to call this API. Defaults to `http://localhost:5173` if unset. |
 
 Root `.env` (Docker Compose only, see `.env.example`): `MYSQL_ROOT_PASSWORD`, `JWT_SECRET`.
 

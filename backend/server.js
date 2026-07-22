@@ -5,7 +5,7 @@ const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: env.CORS_ORIGINS }));
 app.use(express.json());
 
 

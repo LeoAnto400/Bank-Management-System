@@ -48,6 +48,7 @@ jobs:
           DB_NAME=financial_system_test
           PORT=5001
           JWT_SECRET=ci-test-secret-not-for-production-aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          CORS_ORIGIN=http://localhost:5173
           EOF
 
       - run: npm test
